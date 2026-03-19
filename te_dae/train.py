@@ -32,6 +32,10 @@ def _build_loader(features: np.ndarray, targets: np.ndarray | None, batch_size: 
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
 
 
+def _should_log(epoch: int, epochs: int, log_interval: int) -> bool:
+    return epoch == 1 or epoch == epochs or epoch % log_interval == 0
+
+
 def train_autoencoder(
     model: nn.Module,
     noisy_features: np.ndarray,
@@ -40,6 +44,7 @@ def train_autoencoder(
     batch_size: int,
     learning_rate: float,
     device: torch.device,
+    log_interval: int = 100,
 ) -> TrainHistory:
     loader = _build_loader(noisy_features, clean_features, batch_size=batch_size, shuffle=True)
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -47,7 +52,11 @@ def train_autoencoder(
     model.to(device)
     history = TrainHistory(losses=[], accuracies=[])
 
-    for _ in range(epochs):
+    print(
+        f"[DAE] start training: samples={len(loader.dataset)}, batch_size={batch_size}, "
+        f"epochs={epochs}, lr={learning_rate}, device={device}"
+    )
+    for epoch in range(1, epochs + 1):
         model.train()
         running_loss = 0.0
         total = 0
@@ -61,8 +70,11 @@ def train_autoencoder(
             optimizer.step()
             running_loss += loss.item() * batch_x.size(0)
             total += batch_x.size(0)
-        history.losses.append(running_loss / max(total, 1))
+        epoch_loss = running_loss / max(total, 1)
+        history.losses.append(epoch_loss)
         history.accuracies.append(0.0)
+        if _should_log(epoch, epochs, log_interval):
+            print(f"[DAE] epoch {epoch}/{epochs} loss={epoch_loss:.6f}")
     return history
 
 
@@ -83,6 +95,7 @@ def train_classifier(
     batch_size: int,
     learning_rate: float,
     device: torch.device,
+    log_interval: int = 20,
 ) -> TrainHistory:
     loader = _build_loader(features, labels.astype(np.int64), batch_size=batch_size, shuffle=True)
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -90,7 +103,11 @@ def train_classifier(
     model.to(device)
     history = TrainHistory(losses=[], accuracies=[])
 
-    for _ in range(epochs):
+    print(
+        f"[CLF] start training: samples={len(loader.dataset)}, batch_size={batch_size}, "
+        f"epochs={epochs}, lr={learning_rate}, device={device}"
+    )
+    for epoch in range(1, epochs + 1):
         model.train()
         running_loss = 0.0
         correct = 0
@@ -107,8 +124,12 @@ def train_classifier(
             predictions = logits.argmax(dim=1)
             correct += (predictions == batch_y).sum().item()
             total += batch_x.size(0)
-        history.losses.append(running_loss / max(total, 1))
-        history.accuracies.append(correct / max(total, 1))
+        epoch_loss = running_loss / max(total, 1)
+        epoch_acc = correct / max(total, 1)
+        history.losses.append(epoch_loss)
+        history.accuracies.append(epoch_acc)
+        if _should_log(epoch, epochs, log_interval):
+            print(f"[CLF] epoch {epoch}/{epochs} loss={epoch_loss:.6f} acc={epoch_acc:.4f}")
     return history
 
 

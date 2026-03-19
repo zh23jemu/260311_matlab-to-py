@@ -79,8 +79,18 @@ def main() -> None:
 
     mat_path = root / "CNN" / "data567.mat"
     device = _resolve_device(args.device)
-    bundle = load_te_dataset(mat_path)
 
+    print(f"[PIPELINE] root={root}")
+    print(f"[PIPELINE] output_dir={paths['root']}")
+    print(f"[PIPELINE] seed={args.seed} wuc={args.wuc} device={device}")
+    print(f"[PIPELINE] loading dataset from {mat_path}")
+    bundle = load_te_dataset(mat_path)
+    print(
+        f"[PIPELINE] dataset loaded: dae_train_shape={bundle.dae_train_data.shape}, "
+        f"train_faults={len(bundle.train_standardized)}, test_faults={len(bundle.test_standardized)}"
+    )
+
+    print("[PIPELINE] adding Gaussian noise for DAE training")
     dae_train_noisy = add_noise(bundle.dae_train_data, wuc=args.wuc, seed=args.seed)
     dae_model = DenoisingAutoencoder(input_dim=bundle.dae_train_data.shape[1])
     dae_history = train_autoencoder(
@@ -91,8 +101,10 @@ def main() -> None:
         batch_size=32,
         learning_rate=0.0001,
         device=device,
+        log_interval=max(1, args.dae_epochs // 10),
     )
 
+    print("[PIPELINE] encoding train and test features with DAE")
     encoded_train = {
         fault_id: encode_features(dae_model, values, device=device) for fault_id, values in bundle.train_standardized.items()
     }
@@ -107,6 +119,7 @@ def main() -> None:
     bundle.feature_mean = feature_mean.astype(np.float32)
     bundle.feature_std = feature_std.astype(np.float32)
 
+    print("[PIPELINE] standardizing encoded features using d00 statistics")
     bundle.classifier_train_features = {
         fault_id: ((encoded_train[fault_id] - feature_mean) / feature_std).astype(np.float32)
         for fault_id in TRAIN_FAULT_IDS
@@ -117,6 +130,7 @@ def main() -> None:
     }
 
     clf_train_x, clf_train_y = _stack_features(bundle.classifier_train_features, bundle.classifier_labels)
+    print(f"[PIPELINE] classifier training tensor shape={clf_train_x.shape}, labels={clf_train_y.shape}")
     classifier = ClassifierNet(input_dim=clf_train_x.shape[1], num_classes=len(TRAIN_FAULT_IDS))
     clf_history = train_classifier(
         classifier,
@@ -126,8 +140,10 @@ def main() -> None:
         batch_size=300,
         learning_rate=0.0001,
         device=device,
+        log_interval=max(1, args.clf_epochs // 10),
     )
 
+    print("[PIPELINE] evaluating classifier on test faults")
     per_fault_accuracy = {}
     y_true_all = []
     y_pred_all = []
@@ -139,7 +155,9 @@ def main() -> None:
         truth = np.full(count, label, dtype=np.int64)
         y_true_all.append(truth)
         y_pred_all.append(preds)
-        per_fault_accuracy[f"F{fault_id}"] = float((preds == label).mean())
+        fault_acc = float((preds == label).mean())
+        per_fault_accuracy[f"F{fault_id}"] = fault_acc
+        print(f"[EVAL] F{fault_id} accuracy={fault_acc:.4f} samples={count}")
 
     y_true = np.concatenate(y_true_all)
     y_pred = np.concatenate(y_pred_all)
@@ -147,6 +165,7 @@ def main() -> None:
     heat = build_confusion(y_true, y_pred, labels=list(range(1, len(TRAIN_FAULT_IDS) + 1)))
     fault_labels = [f"F{fault_id}" for fault_id in TRAIN_FAULT_IDS]
 
+    print("[PIPELINE] saving models and metrics")
     torch.save(
         {
             "state_dict": dae_model.state_dict(),
@@ -171,6 +190,7 @@ def main() -> None:
         },
     )
 
+    print("[PIPELINE] rendering figures")
     plot_matrix_lines(bundle.train_raw[0], "Figure 4.2 Unstandardized d00", paths["figures"] / "figure_4_2.png")
     plot_matrix_lines(bundle.train_standardized[0], "Figure 4.3 Standardized d00", paths["figures"] / "figure_4_3.png")
     plot_matrix_lines(bundle.train_standardized[0], "Figure 4.4 d00 Standardized Data", paths["figures"] / "figure_4_4.png")
@@ -189,9 +209,8 @@ def main() -> None:
     plot_heatmap(heat, fault_labels, "Figure 4.12 Heatmap", paths["figures"] / "figure_4_12.png")
     plot_training_history(dae_history.losses, dae_history.accuracies, "DAE Training", paths["figures"] / "dae_training.png")
 
-    print(f"Device: {device}")
-    print(f"Mean accuracy: {mean_accuracy:.4f}")
-    print(f"Saved outputs to: {paths['root']}")
+    print(f"[RESULT] mean_accuracy={mean_accuracy:.4f}")
+    print(f"[RESULT] saved outputs to {paths['root']}")
 
 
 if __name__ == "__main__":
