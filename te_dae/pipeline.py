@@ -23,8 +23,8 @@ from te_dae.plotting import (
 from te_dae.train import build_confusion, encode_features, predict_classes, set_seed, train_autoencoder, train_classifier
 
 
-def _output_dirs(root: Path) -> dict[str, Path]:
-    outputs = root / "outputs"
+def _output_dirs(root: Path, output_dir: str) -> dict[str, Path]:
+    outputs = root / output_dir
     paths = {
         "root": outputs,
         "figures": outputs / "figures",
@@ -59,6 +59,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--wuc", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    parser.add_argument("--output-dir", default="outputs")
     return parser.parse_args()
 
 
@@ -73,7 +74,7 @@ def _resolve_device(choice: str) -> torch.device:
 def main() -> None:
     args = _parse_args()
     root = Path(__file__).resolve().parent.parent
-    paths = _output_dirs(root)
+    paths = _output_dirs(root, args.output_dir)
     set_seed(args.seed)
 
     mat_path = root / "CNN" / "data567.mat"
@@ -191,3 +192,7 @@ def main() -> None:
     print(f"Device: {device}")
     print(f"Mean accuracy: {mean_accuracy:.4f}")
     print(f"Saved outputs to: {paths['root']}")
+
+
+if __name__ == "__main__":
+    main()

@@ -3,3 +3,5 @@ outputs/
 __pycache__/
 *.pyc
 *.out
+__docx_tmp/
+tmp_smoke/

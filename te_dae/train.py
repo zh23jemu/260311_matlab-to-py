@@ -27,7 +27,9 @@ def _build_loader(features: np.ndarray, targets: np.ndarray | None, batch_size: 
     else:
         target_tensor = torch.from_numpy(targets)
         dataset = TensorDataset(feature_tensor, target_tensor)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    generator = torch.Generator()
+    generator.manual_seed(torch.initial_seed())
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
 
 
 def train_autoencoder(
@@ -39,12 +41,8 @@ def train_autoencoder(
     learning_rate: float,
     device: torch.device,
 ) -> TrainHistory:
-    dataset = TensorDataset(
-        torch.from_numpy(noisy_features.astype(np.float32)),
-        torch.from_numpy(clean_features.astype(np.float32)),
-    )
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    loader = _build_loader(noisy_features, clean_features, batch_size=batch_size, shuffle=True)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     criterion = nn.MSELoss()
     model.to(device)
     history = TrainHistory(losses=[], accuracies=[])
@@ -87,7 +85,7 @@ def train_classifier(
     device: torch.device,
 ) -> TrainHistory:
     loader = _build_loader(features, labels.astype(np.int64), batch_size=batch_size, shuffle=True)
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
     model.to(device)
     history = TrainHistory(losses=[], accuracies=[])
