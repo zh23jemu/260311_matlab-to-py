@@ -10,15 +10,24 @@
 
 set -euo pipefail
 
+FEATURE_MODE=${FEATURE_MODE:-bottleneck_relu}
+OUTPUT_DIR=${OUTPUT_DIR:-outputs_${FEATURE_MODE}}
+REPORT_SUFFIX=${REPORT_SUFFIX:-${FEATURE_MODE}}
+
 cd /net/8k3/e0fs01/users/xj62kv/260311_matlab-to-py || exit 1
 source venv/bin/activate || exit 1
+
+echo "[SLURM] FEATURE_MODE=${FEATURE_MODE}"
+echo "[SLURM] OUTPUT_DIR=${OUTPUT_DIR}"
+echo "[SLURM] REPORT_SUFFIX=${REPORT_SUFFIX}"
 
 python main.py \
   --dae-epochs 2500 \
   --clf-epochs 300 \
   --device cpu \
-  --output-dir outputs
+  --output-dir "${OUTPUT_DIR}" \
+  --dae-feature-mode "${FEATURE_MODE}"
 
 mkdir -p report_assets
-cp outputs/metrics/metrics.json report_assets/metrics.json
-cp outputs/figures/figure_4_12.png report_assets/figure_4_12.png
+cp "${OUTPUT_DIR}/metrics/metrics.json" "report_assets/metrics_${REPORT_SUFFIX}.json"
+cp "${OUTPUT_DIR}/figures/figure_4_12.png" "report_assets/figure_4_12_${REPORT_SUFFIX}.png"

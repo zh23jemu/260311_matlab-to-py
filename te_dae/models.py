@@ -21,6 +21,19 @@ class DenoisingAutoencoder(nn.Module):
         x = self.act(self.fc3(x))
         return x
 
+    def encode_fc3_linear(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.act(self.fc1(x))
+        x = self.act(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+    def extract_features(self, x: torch.Tensor, mode: str = "fc3_linear") -> torch.Tensor:
+        if mode == "fc3_linear":
+            return self.encode_fc3_linear(x)
+        if mode == "bottleneck_relu":
+            return self.encode(x)
+        raise ValueError(f"Unsupported feature extraction mode: {mode}")
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.encode(x)
         x = self.act(self.fc4(x))

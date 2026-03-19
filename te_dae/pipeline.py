@@ -60,6 +60,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--output-dir", default="outputs")
+    parser.add_argument("--dae-feature-mode", default="fc3_linear", choices=["fc3_linear", "bottleneck_relu"])
     return parser.parse_args()
 
 
@@ -83,6 +84,7 @@ def main() -> None:
     print(f"[PIPELINE] root={root}")
     print(f"[PIPELINE] output_dir={paths['root']}")
     print(f"[PIPELINE] seed={args.seed} wuc={args.wuc} device={device}")
+    print(f"[PIPELINE] dae_feature_mode={args.dae_feature_mode}")
     print(f"[PIPELINE] loading dataset from {mat_path}")
     bundle = load_te_dataset(mat_path)
     print(
@@ -106,10 +108,12 @@ def main() -> None:
 
     print("[PIPELINE] encoding train and test features with DAE")
     encoded_train = {
-        fault_id: encode_features(dae_model, values, device=device) for fault_id, values in bundle.train_standardized.items()
+        fault_id: encode_features(dae_model, values, device=device, mode=args.dae_feature_mode)
+        for fault_id, values in bundle.train_standardized.items()
     }
     encoded_test = {
-        fault_id: encode_features(dae_model, values, device=device) for fault_id, values in bundle.test_standardized.items()
+        fault_id: encode_features(dae_model, values, device=device, mode=args.dae_feature_mode)
+        for fault_id, values in bundle.test_standardized.items()
     }
 
     d00_features = encoded_train[0]
@@ -173,6 +177,7 @@ def main() -> None:
             "base_std": bundle.base_std,
             "feature_mean": bundle.feature_mean,
             "feature_std": bundle.feature_std,
+            "feature_mode": args.dae_feature_mode,
         },
         paths["models"] / "dae.pt",
     )
@@ -185,6 +190,7 @@ def main() -> None:
             "wuc": args.wuc,
             "dae_epochs": args.dae_epochs,
             "clf_epochs": args.clf_epochs,
+            "dae_feature_mode": args.dae_feature_mode,
             "mean_accuracy": mean_accuracy,
             "per_fault_accuracy": per_fault_accuracy,
         },

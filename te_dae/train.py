@@ -78,12 +78,12 @@ def train_autoencoder(
     return history
 
 
-def encode_features(model: nn.Module, features: np.ndarray, device: torch.device) -> np.ndarray:
+def encode_features(model: nn.Module, features: np.ndarray, device: torch.device, mode: str = "fc3_linear") -> np.ndarray:
     model.eval()
     model.to(device)
     with torch.no_grad():
         tensor = torch.from_numpy(features.astype(np.float32)).to(device)
-        encoded = model.encode(tensor).cpu().numpy().astype(np.float32)
+        encoded = model.extract_features(tensor, mode=mode).cpu().numpy().astype(np.float32)
     return encoded
 
 
