@@ -60,7 +60,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--output-dir", default="outputs")
-    parser.add_argument("--dae-feature-mode", default="fc3_linear", choices=["fc3_linear", "bottleneck_relu"])
+    parser.add_argument("--dae-feature-mode", default="bottleneck_relu", choices=["fc3_linear", "bottleneck_relu"])
     return parser.parse_args()
 
 
@@ -178,15 +178,18 @@ def main() -> None:
             "feature_mean": bundle.feature_mean,
             "feature_std": bundle.feature_std,
             "feature_mode": args.dae_feature_mode,
+            "seed": args.seed,
+            "wuc": args.wuc,
         },
         paths["models"] / "dae.pt",
     )
-    torch.save({"state_dict": classifier.state_dict()}, paths["models"] / "classifier.pt")
+    torch.save({"state_dict": classifier.state_dict(), "seed": args.seed}, paths["models"] / "classifier.pt")
 
     _save_json(
         paths["metrics"] / "metrics.json",
         {
             "device": str(device),
+            "seed": args.seed,
             "wuc": args.wuc,
             "dae_epochs": args.dae_epochs,
             "clf_epochs": args.clf_epochs,
