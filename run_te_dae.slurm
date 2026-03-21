@@ -13,8 +13,10 @@ set -euo pipefail
 FEATURE_MODE=${FEATURE_MODE:-bottleneck_relu}
 SEED=${SEED:-42}
 WUC=${WUC:-0.01}
-OUTPUT_DIR=${OUTPUT_DIR:-outputs_${FEATURE_MODE}_s${SEED}_w${WUC}}
-REPORT_SUFFIX=${REPORT_SUFFIX:-${FEATURE_MODE}_s${SEED}_w${WUC}}
+CLF_LR=${CLF_LR:-0.0001}
+CLF_EPOCHS=${CLF_EPOCHS:-300}
+OUTPUT_DIR=${OUTPUT_DIR:-outputs_${FEATURE_MODE}_s${SEED}_w${WUC}_clr${CLF_LR}_ce${CLF_EPOCHS}}
+REPORT_SUFFIX=${REPORT_SUFFIX:-${FEATURE_MODE}_s${SEED}_w${WUC}_clr${CLF_LR}_ce${CLF_EPOCHS}}
 
 cd /net/8k3/e0fs01/users/xj62kv/260311_matlab-to-py || exit 1
 source venv/bin/activate || exit 1
@@ -22,12 +24,16 @@ source venv/bin/activate || exit 1
 echo "[SLURM] FEATURE_MODE=${FEATURE_MODE}"
 echo "[SLURM] SEED=${SEED}"
 echo "[SLURM] WUC=${WUC}"
+echo "[SLURM] CLF_LR=${CLF_LR}"
+echo "[SLURM] CLF_EPOCHS=${CLF_EPOCHS}"
 echo "[SLURM] OUTPUT_DIR=${OUTPUT_DIR}"
 echo "[SLURM] REPORT_SUFFIX=${REPORT_SUFFIX}"
 
 python main.py \
   --dae-epochs 2500 \
-  --clf-epochs 300 \
+  --clf-epochs "${CLF_EPOCHS}" \
+  --dae-lr 0.0001 \
+  --clf-lr "${CLF_LR}" \
   --device cpu \
   --seed "${SEED}" \
   --wuc "${WUC}" \

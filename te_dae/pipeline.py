@@ -56,6 +56,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TE DAE Python pipeline")
     parser.add_argument("--dae-epochs", type=int, default=2500)
     parser.add_argument("--clf-epochs", type=int, default=300)
+    parser.add_argument("--dae-lr", type=float, default=0.0001)
+    parser.add_argument("--clf-lr", type=float, default=0.0001)
     parser.add_argument("--wuc", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
@@ -84,6 +86,7 @@ def main() -> None:
     print(f"[PIPELINE] root={root}")
     print(f"[PIPELINE] output_dir={paths['root']}")
     print(f"[PIPELINE] seed={args.seed} wuc={args.wuc} device={device}")
+    print(f"[PIPELINE] dae_lr={args.dae_lr} clf_lr={args.clf_lr} clf_epochs={args.clf_epochs}")
     print(f"[PIPELINE] dae_feature_mode={args.dae_feature_mode}")
     print(f"[PIPELINE] loading dataset from {mat_path}")
     bundle = load_te_dataset(mat_path)
@@ -101,7 +104,7 @@ def main() -> None:
         clean_features=bundle.dae_train_data,
         epochs=args.dae_epochs,
         batch_size=32,
-        learning_rate=0.0001,
+        learning_rate=args.dae_lr,
         device=device,
         log_interval=max(1, args.dae_epochs // 10),
     )
@@ -142,7 +145,7 @@ def main() -> None:
         labels=clf_train_y,
         epochs=args.clf_epochs,
         batch_size=300,
-        learning_rate=0.0001,
+        learning_rate=args.clf_lr,
         device=device,
         log_interval=max(1, args.clf_epochs // 10),
     )
@@ -180,10 +183,16 @@ def main() -> None:
             "feature_mode": args.dae_feature_mode,
             "seed": args.seed,
             "wuc": args.wuc,
+            "dae_lr": args.dae_lr,
+            "clf_lr": args.clf_lr,
+            "clf_epochs": args.clf_epochs,
         },
         paths["models"] / "dae.pt",
     )
-    torch.save({"state_dict": classifier.state_dict(), "seed": args.seed}, paths["models"] / "classifier.pt")
+    torch.save(
+        {"state_dict": classifier.state_dict(), "seed": args.seed, "clf_lr": args.clf_lr, "clf_epochs": args.clf_epochs},
+        paths["models"] / "classifier.pt",
+    )
 
     _save_json(
         paths["metrics"] / "metrics.json",
@@ -193,6 +202,8 @@ def main() -> None:
             "wuc": args.wuc,
             "dae_epochs": args.dae_epochs,
             "clf_epochs": args.clf_epochs,
+            "dae_lr": args.dae_lr,
+            "clf_lr": args.clf_lr,
             "dae_feature_mode": args.dae_feature_mode,
             "mean_accuracy": mean_accuracy,
             "per_fault_accuracy": per_fault_accuracy,
