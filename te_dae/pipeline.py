@@ -24,6 +24,7 @@ from te_dae.train import build_confusion, encode_features, predict_classes, set_
 
 
 def _output_dirs(root: Path, output_dir: str) -> dict[str, Path]:
+    """按统一结构创建输出目录。"""
     outputs = root / output_dir
     paths = {
         "root": outputs,
@@ -37,6 +38,7 @@ def _output_dirs(root: Path, output_dir: str) -> dict[str, Path]:
 
 
 def _stack_features(feature_map: dict[int, np.ndarray], label_map: dict[int, int]) -> tuple[np.ndarray, np.ndarray]:
+    """把各故障的特征矩阵按固定顺序拼接成分类器训练输入。"""
     features = np.vstack([feature_map[fault_id] for fault_id in TRAIN_FAULT_IDS]).astype(np.float32)
     labels = np.concatenate(
         [np.full(feature_map[fault_id].shape[0], label_map[fault_id] - 1, dtype=np.int64) for fault_id in TRAIN_FAULT_IDS]
@@ -45,14 +47,17 @@ def _stack_features(feature_map: dict[int, np.ndarray], label_map: dict[int, int
 
 
 def _test_slice_count(fault_id: int) -> int:
+    """按 MATLAB 评估习惯裁剪测试长度，只有 F6 使用 247。"""
     return 247 if fault_id == 6 else 2000
 
 
 def _save_json(path: Path, payload: dict) -> None:
+    """统一保存 JSON 文件。"""
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _parse_args() -> argparse.Namespace:
+    """解析命令行参数，便于本地和 Slurm 两种运行方式共用。"""
     parser = argparse.ArgumentParser(description="TE DAE Python pipeline")
     parser.add_argument("--dae-epochs", type=int, default=2500)
     parser.add_argument("--clf-epochs", type=int, default=300)
@@ -67,6 +72,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _resolve_device(choice: str) -> torch.device:
+    """根据用户选择自动解析训练设备。"""
     if choice == "cpu":
         return torch.device("cpu")
     if choice == "cuda":
@@ -75,6 +81,7 @@ def _resolve_device(choice: str) -> torch.device:
 
 
 def main() -> None:
+    """项目总流程：读数据、训 DAE、提特征、训分类器、评估并导出结果。"""
     args = _parse_args()
     root = Path(__file__).resolve().parent.parent
     paths = _output_dirs(root, args.output_dir)
@@ -89,12 +96,15 @@ def main() -> None:
     print(f"[PIPELINE] dae_lr={args.dae_lr} clf_lr={args.clf_lr} clf_epochs={args.clf_epochs}")
     print(f"[PIPELINE] dae_feature_mode={args.dae_feature_mode}")
     print(f"[PIPELINE] loading dataset from {mat_path}")
+
+    # 第一步：读取 TE 数据并完成列删除与第一次标准化。
     bundle = load_te_dataset(mat_path)
     print(
         f"[PIPELINE] dataset loaded: dae_train_shape={bundle.dae_train_data.shape}, "
         f"train_faults={len(bundle.train_standardized)}, test_faults={len(bundle.test_standardized)}"
     )
 
+    # 第二步：给 DAE 输入添加噪声，让网络学习去噪重建。
     print("[PIPELINE] adding Gaussian noise for DAE training")
     dae_train_noisy = add_noise(bundle.dae_train_data, wuc=args.wuc, seed=args.seed)
     dae_model = DenoisingAutoencoder(input_dim=bundle.dae_train_data.shape[1])
@@ -109,6 +119,7 @@ def main() -> None:
         log_interval=max(1, args.dae_epochs // 10),
     )
 
+    # 第三步：用训练好的 DAE 对 train/test 数据做编码。
     print("[PIPELINE] encoding train and test features with DAE")
     encoded_train = {
         fault_id: encode_features(dae_model, values, device=device, mode=args.dae_feature_mode)
@@ -119,6 +130,7 @@ def main() -> None:
         for fault_id, values in bundle.test_standardized.items()
     }
 
+    # 第四步：按照文档约定，用编码后的 d00 特征做第二次标准化。
     d00_features = encoded_train[0]
     feature_mean = d00_features.mean(axis=0)
     feature_std = d00_features.std(axis=0, ddof=1)
@@ -136,6 +148,7 @@ def main() -> None:
         for fault_id in TRAIN_FAULT_IDS
     }
 
+    # 第五步：拼接故障特征，训练分类器。
     clf_train_x, clf_train_y = _stack_features(bundle.classifier_train_features, bundle.classifier_labels)
     print(f"[PIPELINE] classifier training tensor shape={clf_train_x.shape}, labels={clf_train_y.shape}")
     classifier = ClassifierNet(input_dim=clf_train_x.shape[1], num_classes=len(TRAIN_FAULT_IDS))
@@ -150,6 +163,7 @@ def main() -> None:
         log_interval=max(1, args.clf_epochs // 10),
     )
 
+    # 第六步：逐个故障评估测试集表现，并保存每类准确率。
     print("[PIPELINE] evaluating classifier on test faults")
     per_fault_accuracy = {}
     y_true_all = []
@@ -172,6 +186,7 @@ def main() -> None:
     heat = build_confusion(y_true, y_pred, labels=list(range(1, len(TRAIN_FAULT_IDS) + 1)))
     fault_labels = [f"F{fault_id}" for fault_id in TRAIN_FAULT_IDS]
 
+    # 第七步：保存模型、指标和图像，便于本地对比与提交结果。
     print("[PIPELINE] saving models and metrics")
     torch.save(
         {
