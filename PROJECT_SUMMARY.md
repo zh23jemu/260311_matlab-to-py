@@ -26,10 +26,15 @@ The target workflow is:
 - `te_dae/plotting.py`: plotting helpers for Figures 4.2 to 4.12 and DAE training.
 - `CNN/`: original MATLAB reference code and `data567.mat`.
 - `report_assets/`: git-tracked selected training results used for sync/review.
-- `outputs/`: default runtime output directory, ignored by git.
+- `outputs/`: runtime output directories, ignored by git.
 - `run_te_dae.slurm`: single Slurm job wrapper for one training run.
-- `submit_te_dae_sweep.sh`: batch submission script for seed/wuc sweep.
-- `submit_te_dae_wuc_finetune.sh`: finer sweep around the current best `wuc`.
+- `submit_te_dae_sweep.sh`: seed/wuc sweep.
+- `submit_te_dae_wuc_finetune.sh`: fine sweep near the first useful `wuc` range.
+- `submit_te_dae_wuc_high.sh`: upper `wuc` sweep.
+- `submit_te_dae_clf_sweep.sh`: classifier learning-rate/epoch sweep.
+- `submit_te_dae_clf_finetune.sh`: classifier fine-tune around the best learning rate.
+- `submit_te_dae_best_local_finetune.sh`: local search around the current best full setup.
+- `submit_te_dae_final_epoch_sweep.sh`: final epoch-only sweep.
 
 ## Key Data Conventions
 
@@ -48,7 +53,7 @@ The target workflow is:
 - Architecture: `50 -> 50 -> 45 -> 40 -> 45 -> 50 -> 50`
 - Hidden activations: `LeakyReLU`
 - Training optimizer: `SGD(momentum=0.9)`
-- Default DAE training parameters:
+- Default DAE parameters:
   - learning rate: `0.0001`
   - epochs: `2500`
   - batch size: `32`
@@ -58,10 +63,7 @@ The target workflow is:
 - Architecture: `40 -> 400 -> 250 -> 17`
 - Hidden activations: `Tanh`
 - Training optimizer: `SGD(momentum=0.9)`
-- Default classifier training parameters:
-  - learning rate: `0.0001`
-  - epochs: `300`
-  - batch size: `300`
+- Tuned classifier parameters are now part of the search space.
 
 ## Feature Extraction Modes
 
@@ -70,14 +72,14 @@ The target workflow is:
 - `bottleneck_relu`
 - `fc3_linear`
 
-Current default is `bottleneck_relu`.
+Current default and preferred mode is `bottleneck_relu`.
 
-This is important because the project compared two interpretations of the MATLAB DAE feature layer:
+Interpretation used in this project:
 
 - `bottleneck_relu`: encoded output after the third activation.
 - `fc3_linear`: linear output of `fc3` before the third activation.
 
-Current experiments indicate `bottleneck_relu` is the better default.
+Current experiments indicate `fc3_linear` does not improve the difficult classes enough to justify switching.
 
 ## Runtime Output Conventions
 
@@ -96,7 +98,7 @@ Key files:
 - `models/dae.pt`
 - `models/classifier.pt`
 
-`report_assets/` should only contain selected synced results intended for git tracking and comparison.
+`report_assets/` contains selected synced results intended for git tracking and comparison.
 
 ## Metrics File Conventions
 
@@ -107,13 +109,15 @@ Key files:
 - `wuc`
 - `dae_epochs`
 - `clf_epochs`
+- `dae_lr`
+- `clf_lr`
 - `dae_feature_mode`
 - `mean_accuracy`
 - `per_fault_accuracy`
 
 ## Logging Conventions
 
-Training now emits progress logs to stdout for Slurm log inspection:
+Training emits progress logs to stdout for Slurm log inspection:
 
 - `[PIPELINE]`: dataset loading, standardization, feature encoding, save stages.
 - `[DAE]`: start message and periodic DAE loss updates.
@@ -128,6 +132,8 @@ Training now emits progress logs to stdout for Slurm log inspection:
 - `FEATURE_MODE`
 - `SEED`
 - `WUC`
+- `CLF_LR`
+- `CLF_EPOCHS`
 - `OUTPUT_DIR`
 - `REPORT_SUFFIX`
 
@@ -136,8 +142,10 @@ Default behavior:
 - `FEATURE_MODE=bottleneck_relu`
 - `SEED=42`
 - `WUC=0.01`
-- `OUTPUT_DIR=outputs_${FEATURE_MODE}_s${SEED}_w${WUC}`
-- `REPORT_SUFFIX=${FEATURE_MODE}_s${SEED}_w${WUC}`
+- `CLF_LR=0.0001`
+- `CLF_EPOCHS=300`
+- `OUTPUT_DIR=outputs_${FEATURE_MODE}_s${SEED}_w${WUC}_clr${CLF_LR}_ce${CLF_EPOCHS}`
+- `REPORT_SUFFIX=${FEATURE_MODE}_s${SEED}_w${WUC}_clr${CLF_LR}_ce${CLF_EPOCHS}`
 
 After training, the script copies selected artifacts into `report_assets/`:
 
@@ -156,56 +164,45 @@ This avoids collisions between concurrent Slurm jobs.
 
 ### Difficult classes
 
-The main remaining alignment problem versus the document-style target performance is:
+The main remaining alignment problem versus the document-style target performance is still concentrated in:
 
 - `F8`
 - `F11`
 - `F13`
 
-### Best current targeted result for `F8/F11/F13`
+These classes improved significantly during tuning, but they remain the limiting group.
 
-From the tracked sweeps, the best targeted configuration so far is:
+### Final Best Configuration
+
+The current best result in this repo is:
 
 - `FEATURE_MODE=bottleneck_relu`
 - `SEED=42`
-- `WUC=0.02`
+- `WUC=0.025`
+- `CLF_LR=0.0002`
+- `CLF_EPOCHS=1000`
 
 Tracked result file:
 
-- `report_assets/metrics_bottleneck_s42_w002.json`
+- `report_assets/metrics_bottleneck_s42_w0025_clr2e4_ce1000.json`
 
-This setting improves `F8/F11/F13` over the earlier baseline, but still does not fully align with the document-level expectation for those classes.
+Key result values from that run:
 
-### Best current overall mean accuracy
+- `mean_accuracy = 0.9494705882352942`
+- `F8 = 0.8670`
+- `F11 = 0.8730`
+- `F13 = 0.7830`
 
-The best overall mean accuracy in the recent sweep is:
+This is the best overall and best targeted result found so far along the current training route.
 
-- `FEATURE_MODE=bottleneck_relu`
-- `SEED=42`
-- `WUC=0.005`
+## Practical Recommendation
 
-Tracked result file:
-
-- `report_assets/metrics_bottleneck_s42_w0005.json`
-
-This setting is more balanced overall, but slightly weaker than `WUC=0.02` on the specific hard classes.
-
-## Recommended Next Step
-
-Continue from:
+If you need one recommended configuration for future runs, use:
 
 - `FEATURE_MODE=bottleneck_relu`
 - `SEED=42`
+- `WUC=0.025`
+- `CLF_LR=0.0002`
+- `CLF_EPOCHS=1000`
 
-Then fine-sweep `WUC` around the currently best targeted region:
-
-- `0.015`
-- `0.018`
-- `0.020`
-- `0.022`
-- `0.025`
-
-Use:
-
-- `submit_te_dae_wuc_finetune.sh`
-
+If you continue tuning from here, avoid broad sweeps. The search is now in a plateau region, so only very local changes are justified.
