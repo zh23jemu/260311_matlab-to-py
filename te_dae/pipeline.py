@@ -226,22 +226,22 @@ def main() -> None:
     )
 
     print("[PIPELINE] rendering figures")
-    plot_matrix_lines(bundle.train_raw[0], "Figure 4.2 Unstandardized d00", paths["figures"] / "figure_4_2.png")
-    plot_matrix_lines(bundle.train_standardized[0], "Figure 4.3 Standardized d00", paths["figures"] / "figure_4_3.png")
-    plot_matrix_lines(bundle.train_standardized[0], "Figure 4.4 d00 Standardized Data", paths["figures"] / "figure_4_4.png")
-    plot_matrix_lines(bundle.train_standardized[1], "Figure 4.5 d01 Standardized Data", paths["figures"] / "figure_4_5.png")
-    plot_matrix_lines(bundle.train_standardized[2], "Figure 4.6 d02 Standardized Data", paths["figures"] / "figure_4_6.png")
-    plot_matrix_lines(clf_train_x, "Figure 4.7 Training Feature Standardization", paths["figures"] / "figure_4_7.png")
+    plot_matrix_lines(bundle.train_raw[0], "Figure 1.2 Unstandardized d00", paths["figures"] / "figure_4_2.png")
+    plot_matrix_lines(bundle.train_standardized[0], "Figure 1.3 Standardized d00", paths["figures"] / "figure_4_3.png")
+    plot_matrix_lines(bundle.train_standardized[0], "Figure 1.4 d00 Standardized Data", paths["figures"] / "figure_4_4.png")
+    plot_matrix_lines(bundle.train_standardized[1], "Figure 1.5 d01 Standardized Data", paths["figures"] / "figure_4_5.png")
+    plot_matrix_lines(bundle.train_standardized[2], "Figure 1.6 d02 Standardized Data", paths["figures"] / "figure_4_6.png")
+    plot_matrix_lines(clf_train_x, "Figure 1.7 Training Feature Standardization", paths["figures"] / "figure_4_7.png")
     plot_matrix_lines(
         np.vstack([bundle.classifier_test_features[fault_id][: min(200, bundle.classifier_test_features[fault_id].shape[0])] for fault_id in TRAIN_FAULT_IDS]),
-        "Figure 4.8 Testing Feature Standardization",
+        "Figure 1.8 Testing Feature Standardization",
         paths["figures"] / "figure_4_8.png",
         max_rows=200,
     )
-    plot_label_sequence(y_true, "Figure 4.9 Data Labels", paths["figures"] / "figure_4_9.png")
+    plot_label_sequence(y_true, "Figure 1.9 Data Labels", paths["figures"] / "figure_4_9.png")
     plot_network_diagram(paths["figures"] / "figure_4_10.png")
-    plot_training_history(clf_history.losses, clf_history.accuracies, "Figure 4.11 Training Process", paths["figures"] / "figure_4_11.png")
-    plot_heatmap(heat, fault_labels, "Figure 4.12 Heatmap", paths["figures"] / "figure_4_12.png")
+    plot_training_history(clf_history.losses, clf_history.accuracies, "Figure 1.11 Training Process", paths["figures"] / "figure_4_11.png")
+    plot_heatmap(heat, fault_labels, "Figure 1.12 Heatmap", paths["figures"] / "figure_4_12.png")
     plot_training_history(dae_history.losses, dae_history.accuracies, "DAE Training", paths["figures"] / "dae_training.png")
 
     print(f"[RESULT] mean_accuracy={mean_accuracy:.4f}")

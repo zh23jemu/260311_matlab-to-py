@@ -26,7 +26,7 @@ def plot_matrix_lines(data: np.ndarray, title: str, path: Path, max_rows: int = 
 
 
 def plot_label_sequence(labels: np.ndarray, title: str, path: Path) -> None:
-    """绘制标签序列图，对应文档里的 Figure 4.9。"""
+    """绘制标签序列图，对应文档里的 Figure 1.9。"""
     fig, ax = plt.subplots(figsize=(10, 3))
     ax.plot(labels, linewidth=1)
     ax.set_title(title)
@@ -102,5 +102,5 @@ def plot_network_diagram(path: Path) -> None:
             xycoords=ax.transAxes,
             arrowprops={"arrowstyle": "->", "lw": 1.5},
         )
-    ax.set_title("Figure 4.10 Network Structure")
+    ax.set_title("Figure 1.10 Network Structure")
     _save(fig, path)

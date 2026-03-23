@@ -101,7 +101,9 @@ def add_noise(data: np.ndarray, wuc: float, seed: int) -> np.ndarray:
 
 一、训练样本与正常样本建立网络模型并训练网络。
 
-本文使用六层全连接降噪自编码器完成数据编码与重建，其编码部分将输入的 50 维特征映射到 40 维瓶颈特征，解码部分再将其恢复至原始输入维度。网络结构与原文档中的 DAE 思路保持一致，其 Python 实现见 [models.py](/C:/Coding/260311_matlab-to-py/te_dae/models.py)，部分程序如下：
+在完成数据标准化和噪声添加之后，本文进一步利用降噪自编码器对 TE 过程数据进行特征提取。降噪自编码器的基本思想是：将带噪输入样本送入网络，通过编码器压缩到低维特征空间，再由解码器将其重建回原始输入，从而使网络在去噪重建的过程中学习到更具代表性的深层特征。与原文档中的实现思路一致，本文选取 50 维标准化数据作为网络输入，并采用六层全连接结构完成编码与解码。
+
+本文学习率设置为 `0.0001`，迭代次数设置为 `2500` 次，批次尺寸设置为 `32`，隐含层第一层设置为 `50`，第二层设置为 `45`，第三层设置为 `40`。其中，编码器部分将输入特征逐步压缩至 40 维瓶颈层，解码器部分再按对称结构恢复原始输入维度。其 Python 实现见 [models.py](/C:/Coding/260311_matlab-to-py/te_dae/models.py)，程序部分如下：
 
 ```python
 class DenoisingAutoencoder(nn.Module):
@@ -116,7 +118,66 @@ class DenoisingAutoencoder(nn.Module):
         self.act = nn.LeakyReLU()
 ```
 
-DAE 训练参数设置如下：学习率为 `0.0001`，迭代次数为 `2500`，批次尺寸为 `32`。该部分调用程序见 [pipeline.py](/C:/Coding/260311_matlab-to-py/te_dae/pipeline.py)，如下所示：
+由上式可以看出，该网络的整体结构可概括为 `50-45-40-45-50`，并在各层之间引入 `LeakyReLU` 激活函数。虽然 Python 中的层定义与原文档中的 MATLAB 写法不同，但二者在网络层数、隐含层神经元设置以及编码解码的总体思想上是一致的。
+
+（1）参数随机化，程序如下：
+
+在网络训练过程中，为了避免样本按故障类别顺序排列对训练过程造成影响，需要在每个训练阶段对样本进行随机打乱。当前 Python 程序通过 `DataLoader` 的 `shuffle=True` 和固定随机种子生成器来完成这一过程，其实现见 [train.py](/C:/Coding/260311_matlab-to-py/te_dae/train.py)，程序如下：
+
+```python
+def _build_loader(features: np.ndarray, targets: np.ndarray | None, batch_size: int, shuffle: bool) -> DataLoader:
+    feature_tensor = torch.from_numpy(features.astype(np.float32))
+    if targets is None:
+        dataset = TensorDataset(feature_tensor, feature_tensor)
+    else:
+        target_tensor = torch.from_numpy(targets)
+        dataset = TensorDataset(feature_tensor, target_tensor)
+
+    generator = torch.Generator()
+    generator.manual_seed(torch.initial_seed())
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
+```
+
+由此可见，当前 Python 实现与原文档中“先随机化样本，再进入网络训练”的处理方式是一致的，并且在固定随机种子的条件下能够保证实验可复现。
+
+（2）设置网络层参数，6 层全连接层程序如下：
+
+按照原文档的写法，需要分别设置输入层尺寸、各层全连接层神经元个数以及输出维度。对于当前 Python 版本来说，这部分参数已经直接体现在模型定义中，即输入层维度为 50，第一隐含层为 50，第二隐含层为 45，第三隐含层为 40，解码层对称恢复为 45 和 50，最后输出层恢复到输入维度。对应关系如下：
+
+```python
+self.fc1 = nn.Linear(input_dim, 50)
+self.fc2 = nn.Linear(50, 45)
+self.fc3 = nn.Linear(45, 40)
+self.fc4 = nn.Linear(40, 45)
+self.fc5 = nn.Linear(45, 50)
+self.fc6 = nn.Linear(50, input_dim)
+```
+
+其中，`input_dim` 表示输入数据维度，在本实验中固定为 50。由此可得，Python 版在网络层参数设置方面与原文档所描述的 6 层全连接网络是一一对应的。
+
+（3）网络层代码，主要包括全连接层，网络层结构 `50-45-40-45-50`，激活函数选择 `LeakyReLU`，程序如下：
+
+```python
+def encode(self, x: torch.Tensor) -> torch.Tensor:
+    x = self.act(self.fc1(x))
+    x = self.act(self.fc2(x))
+    x = self.act(self.fc3(x))
+    return x
+
+
+def forward(self, x: torch.Tensor) -> torch.Tensor:
+    x = self.encode(x)
+    x = self.act(self.fc4(x))
+    x = self.act(self.fc5(x))
+    x = self.fc6(x)
+    return x
+```
+
+由上述程序可以看出，输入样本首先经过三层编码结构提取出瓶颈特征，然后再经三层解码结构重建原始输入，从而完成去噪自编码过程。该网络既能够保留输入数据的主要信息，又能够在特征压缩过程中学习到更具判别能力的隐藏表示。
+
+（4）网络参数设置和训练网络程序如下：
+
+本文选用随机梯度下降法对 DAE 网络进行训练。训练时，输入为带噪样本，输出目标为未加噪的标准化样本，因此损失函数采用均方误差损失。该部分主程序见 [pipeline.py](/C:/Coding/260311_matlab-to-py/te_dae/pipeline.py)，训练子程序见 [train.py](/C:/Coding/260311_matlab-to-py/te_dae/train.py)，程序如下：
 
 ```python
 dae_history = train_autoencoder(
@@ -131,9 +192,27 @@ dae_history = train_autoencoder(
 )
 ```
 
-二、训练数据放入网络模型进行预测。
+```python
+def train_autoencoder(
+    model: nn.Module,
+    noisy_features: np.ndarray,
+    clean_features: np.ndarray,
+    epochs: int,
+    batch_size: int,
+    learning_rate: float,
+    device: torch.device,
+    log_interval: int = 100,
+) -> TrainHistory:
+    loader = _build_loader(noisy_features, clean_features, batch_size=batch_size, shuffle=True)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+    criterion = nn.MSELoss()
+```
 
-DAE 训练完成后，需要将训练数据输入网络，提取编码特征。当前 Python 程序中保留了两种特征提取方式，以便与原文档中的“查看第 3 层特征”过程进行对照。相关程序见 [models.py](/C:/Coding/260311_matlab-to-py/te_dae/models.py)，如下所示：
+从中可以看出，Python 版本在训练过程中同样采用了带噪输入与干净输出配对训练的方式，并通过随机梯度下降和动量项更新网络参数。这与原文档中利用 `sgdm` 训练 DAE 网络的思路相一致。
+
+（5）查看特征代码如下：
+
+DAE 训练完成后，需要将训练数据输入网络，提取编码特征。原文档中通过查看第 3 层特征来完成特征提取；在当前 Python 程序中，则通过 `extract_features` 函数统一封装两种特征提取方式，以便与原文档中的分层查看过程进行对照。相关程序见 [models.py](/C:/Coding/260311_matlab-to-py/te_dae/models.py)，如下所示：
 
 ```python
 def extract_features(self, x: torch.Tensor, mode: str = "fc3_linear") -> torch.Tensor:
@@ -144,9 +223,38 @@ def extract_features(self, x: torch.Tensor, mode: str = "fc3_linear") -> torch.T
     raise ValueError(f"Unsupported feature extraction mode: {mode}")
 ```
 
-经过多轮实验对比，本文最终选取瓶颈层激活输出作为特征提取方式，因为该方式在综合准确率和关键故障识别效果方面更优。
+经过多轮实验对比，本文最终选取瓶颈层激活输出作为特征提取方式，因为该方式在综合准确率和关键故障识别效果方面更优。该过程与原文档中“训练完成后查看编码层特征”的目标是一致的。
 
-将训练数据编码特征再次标准化的程序如下：
+二、训练数据放入网络模型进行预测。
+
+将得到的训练数据输入训练好的 DAE 网络后，即可得到对应的编码特征。该部分程序见 [train.py](/C:/Coding/260311_matlab-to-py/te_dae/train.py)，程序如下：
+
+```python
+def encode_features(model: nn.Module, features: np.ndarray, device: torch.device, mode: str = "fc3_linear") -> np.ndarray:
+    model.eval()
+    model.to(device)
+    with torch.no_grad():
+        tensor = torch.from_numpy(features.astype(np.float32)).to(device)
+        encoded = model.extract_features(tensor, mode=mode).cpu().numpy().astype(np.float32)
+    return encoded
+```
+
+在主流程中，程序会依次对全部训练工况和测试工况进行编码，具体程序如下：
+
+```python
+encoded_train = {
+    fault_id: encode_features(dae_model, values, device=device, mode=args.dae_feature_mode)
+    for fault_id, values in bundle.train_standardized.items()
+}
+encoded_test = {
+    fault_id: encode_features(dae_model, values, device=device, mode=args.dae_feature_mode)
+    for fault_id, values in bundle.test_standardized.items()
+}
+```
+
+三、训练数据编码特征标准化。
+
+与原文档一致，在得到编码特征之后，还需要对编码特征再次进行标准化处理。本文选取正常工况 `d00` 的编码特征作为标准化基准，重新计算其均值和标准差，再将这些统计量应用到所有训练故障特征和测试故障特征上。程序如下：
 
 ```python
 d00_features = encoded_train[0]
@@ -155,17 +263,30 @@ feature_std = d00_features.std(axis=0, ddof=1)
 feature_std[feature_std == 0] = 1.0
 ```
 
-随后，程序使用上述统计量对全部编码特征进行第二次标准化处理。训练数据编码特征标准化结果如下图 1.7 所示：
+```python
+bundle.classifier_train_features = {
+    fault_id: ((encoded_train[fault_id] - feature_mean) / feature_std).astype(np.float32)
+    for fault_id in TRAIN_FAULT_IDS
+}
+```
+
+训练数据编码特征标准化结果如下图 1.7 所示：
 
 ![图 1.7 训练数据编码特征标准化](outputs/figures/figure_4_7.png)
 
-三、将测试数据放入网络模型进行预测。
+由图可见，经过第二次标准化处理之后，各类训练故障特征在数值范围上进一步趋于一致，从而为后续神经网络分类提供了更加稳定的输入。
 
-测试数据同样经过 DAE 编码与第二次标准化处理后，作为后续分类网络的输入。测试数据编码特征标准化结果如下图 1.8 所示：
+四、将测试数据放入网络模型进行预测。
+
+在完成训练数据编码之后，还需要将测试数据输入已经训练好的 DAE 网络，以获取测试样本的编码特征。该过程与训练数据编码过程一致，只是输入数据由训练样本替换为测试样本。测试数据编码特征标准化结果如下图 1.8 所示：
 
 ![图 1.8 测试数据编码特征标准化](outputs/figures/figure_4_8.png)
 
-四、将提取的训练数据和测试数据编码特征保存，并将保存的文件放入神经网络进行分类。
+由图可见，测试数据在经过 DAE 编码和标准化处理后，其特征分布与训练数据特征分布保持了较好的统一性，这为后续分类网络的故障识别提供了基础。
+
+五、将提取的训练数据和测试数据编码特征保存，并将保存的文件放入神经网络进行分类。
+
+经过上述处理后，训练故障特征和测试故障特征均已由原始输入转换为低维编码特征。随后，这些标准化后的编码特征将作为分类神经网络的输入，用于后续故障标签定义、分类网络训练以及测试结果预测。
 
 ### 1.2.4 定义分类标签和训练神经网络
 
