@@ -24,30 +24,24 @@ venv\Scripts\python.exe -m pip install -r requirements.txt
 
 ## 代码结构速览
 
-当前 Python 代码按“看文件名就知道用途”的方式组织，推荐按下面顺序阅读：
+当前 `te_dae` 已经收敛成几个更接近 MATLAB 命名习惯的核心文件，顶层阅读顺序建议如下：
 
 - `main.py`
   最外层入口，直接启动完整流程。
 
-- `te_dae/run_experiment.py`
+- `te_dae/CNN_main.py`
   完整实验主流程，负责把数据、训练、评估、导出串起来。
 
-- `te_dae/load_data.py`
-  负责读取 `CNN/data567.mat`、删列、第一次标准化、噪声生成。
+- `te_dae/data_standar.py`
+  负责读取 `CNN/data567.mat`、删列、第一次标准化、噪声生成，以及数据相关常量。
 
-- `te_dae/models.py`
+- `te_dae/cnnlayer.py`
   负责定义 DAE 和分类器结构。
 
-- `te_dae/train_dae.py`
-  只负责 DAE 训练和编码特征提取。
+- `te_dae/cnn_result_predict.py`
+  集中放置 DAE 训练、分类器训练、预测、混淆矩阵以及出图逻辑。
 
-- `te_dae/train_classifier.py`
-  只负责分类器训练、预测和混淆矩阵。
-
-- `te_dae/plot_results.py`
-  只负责出图。
-
-为兼容旧引用，`te_dae/pipeline.py`、`te_dae/data.py`、`te_dae/train.py`、`te_dae/plotting.py` 仍然保留，但现在是更薄的兼容包装层。
+旧的拆分实现已移到 `te_dae/_archive/` 归档，便于回看，但日常阅读和维护只需要关注上面几个文件。
 
 ## 快速冒烟测试
 
@@ -222,25 +216,19 @@ PYTHON_DAE_REPORT.docx
 如果需要将 Python 版本整理后交付给客户，建议交付以下文件，并说明各文件用途。
 
 - `main.py`
-  项目总入口文件。运行该文件即可启动完整流程，并调用 `te_dae/run_experiment.py` 中的主流程代码。
+  项目总入口文件。运行该文件即可启动完整流程，并调用 `te_dae/CNN_main.py` 中的主流程代码。
 
-- `te_dae/load_data.py`
+- `te_dae/data_standar.py`
   用于读取 `CNN/data567.mat`，删除第 46 列和第 50 列，完成第一次 z-score 标准化，并为 DAE 训练添加高斯噪声。
 
-- `te_dae/models.py`
+- `te_dae/cnnlayer.py`
   定义降噪自编码器和分类神经网络的模型结构。
 
-- `te_dae/train_dae.py`
-  包含 DAE 训练循环和编码特征提取逻辑。
+- `te_dae/cnn_result_predict.py`
+  集中包含 DAE 训练、编码特征提取、分类器训练、分类预测、混淆矩阵构造以及图像导出逻辑。
 
-- `te_dae/train_classifier.py`
-  包含分类器训练、分类预测以及混淆矩阵构造逻辑。
-
-- `te_dae/run_experiment.py`
+- `te_dae/CNN_main.py`
   负责组织完整流程，包括数据读取、DAE 训练、编码特征提取、分类器训练、结果评估以及文件导出。
-
-- `te_dae/plot_results.py`
-  用于生成报告中的各类图像，包括数据曲线图、训练过程图、网络结构图和热值图。
 
 - `requirements.txt`
   项目运行所需的 Python 依赖列表。
