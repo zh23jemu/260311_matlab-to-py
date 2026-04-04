@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import numpy as np
 import torch
 
-from te_dae.cnn_result_predict import (
+from te_dae.dae_result_predict import (
     build_confusion,
     extract_encoded_features,
     plot_heatmap,
@@ -27,7 +27,7 @@ from te_dae.cnn_result_predict import (
     train_autoencoder,
     train_classifier,
 )
-from te_dae.cnnlayer import ClassifierNet, DenoisingAutoencoder
+from te_dae.daelayer import ClassifierNet, DenoisingAutoencoder
 from te_dae.data_standar import TRAIN_FAULT_IDS, add_noise, load_te_dataset, test_slice_count
 
 

@@ -18,11 +18,11 @@ The target workflow is:
 
 ## Repository Structure
 
-- `main.py`: thin entrypoint, calls `te_dae.CNN_main.main()`.
-- `te_dae/CNN_main.py`: end-to-end orchestration, logging, metrics/figure/model export.
+- `main.py`: thin entrypoint, calls `te_dae.DAE_main.main()`.
+- `te_dae/DAE_main.py`: end-to-end orchestration, logging, metrics/figure/model export.
 - `te_dae/data_standar.py`: TE dataset loading, feature column removal, z-score preprocessing, noise injection, shared data constants.
-- `te_dae/cnnlayer.py`: DAE and classifier model definitions.
-- `te_dae/cnn_result_predict.py`: DAE training, encoded feature extraction, classifier training, prediction, confusion matrix, and plotting helpers.
+- `te_dae/daelayer.py`: DAE and classifier model definitions.
+- `te_dae/dae_result_predict.py`: DAE training, encoded feature extraction, classifier training, prediction, confusion matrix, and plotting helpers.
 - `te_dae/_archive/`: archived pre-consolidation split modules kept only for reference.
 - `CNN/`: original MATLAB reference code and `data567.mat`.
 - `report_assets/`: git-tracked selected training results used for sync/review.
@@ -67,7 +67,7 @@ The target workflow is:
 
 ## Feature Extraction Modes
 
-`te_dae/CNN_main.py` supports:
+`te_dae/DAE_main.py` supports:
 
 - `bottleneck_relu`
 - `fc3_linear`

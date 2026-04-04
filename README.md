@@ -29,16 +29,16 @@ venv\Scripts\python.exe -m pip install -r requirements.txt
 - `main.py`
   最外层入口，直接启动完整流程。
 
-- `te_dae/CNN_main.py`
+- `te_dae/DAE_main.py`
   完整实验主流程，负责把数据、训练、评估、导出串起来。
 
 - `te_dae/data_standar.py`
   负责读取 `CNN/data567.mat`、删列、第一次标准化、噪声生成，以及数据相关常量。
 
-- `te_dae/cnnlayer.py`
+- `te_dae/daelayer.py`
   负责定义 DAE 和分类器结构。
 
-- `te_dae/cnn_result_predict.py`
+- `te_dae/dae_result_predict.py`
   集中放置 DAE 训练、分类器训练、预测、混淆矩阵以及出图逻辑。
 
 旧的拆分实现已移到 `te_dae/_archive/` 归档，便于回看，但日常阅读和维护只需要关注上面几个文件。
@@ -216,18 +216,18 @@ PYTHON_DAE_REPORT.docx
 如果需要将 Python 版本整理后交付给客户，建议交付以下文件，并说明各文件用途。
 
 - `main.py`
-  项目总入口文件。运行该文件即可启动完整流程，并调用 `te_dae/CNN_main.py` 中的主流程代码。
+  项目总入口文件。运行该文件即可启动完整流程，并调用 `te_dae/DAE_main.py` 中的主流程代码。
 
 - `te_dae/data_standar.py`
   用于读取 `CNN/data567.mat`，删除第 46 列和第 50 列，完成第一次 z-score 标准化，并为 DAE 训练添加高斯噪声。
 
-- `te_dae/cnnlayer.py`
+- `te_dae/daelayer.py`
   定义降噪自编码器和分类神经网络的模型结构。
 
-- `te_dae/cnn_result_predict.py`
+- `te_dae/dae_result_predict.py`
   集中包含 DAE 训练、编码特征提取、分类器训练、分类预测、混淆矩阵构造以及图像导出逻辑。
 
-- `te_dae/CNN_main.py`
+- `te_dae/DAE_main.py`
   负责组织完整流程，包括数据读取、DAE 训练、编码特征提取、分类器训练、结果评估以及文件导出。
 
 - `requirements.txt`
