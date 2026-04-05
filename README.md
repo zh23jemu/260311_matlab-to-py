@@ -2,6 +2,11 @@
 
 本项目用于复现 `去噪自编码器py编程.docx` 中描述的工作流程，并给出对应的 Python 实现版本。
 
+当前仓库已经整理为更适合交付和阅读的结构：
+- 核心代码集中在 `te_dae/` 下的 4 个主文件
+- 最终报告为 `PYTHON_DAE_REPORT.docx`
+- 当前客户交付压缩包为 `customer_delivery_dae.zip`
+
 ## Python 版本
 
 本项目建议使用 `Python 3.11`。
@@ -43,6 +48,17 @@ venv\Scripts\python.exe -m pip install -r requirements.txt
 
 旧的拆分实现已移到 `te_dae/_archive/` 归档，便于回看，但日常阅读和维护只需要关注上面几个文件。
 
+项目根目录下另外几个常用文件如下：
+
+- `PROJECT_SUMMARY.md`
+  当前项目目标、实验约定和最佳结果的摘要说明。
+
+- `PYTHON_DAE_REPORT.docx`
+  当前整理后的正式报告。
+
+- `customer_delivery_dae.zip`
+  已按交付清单打包好的客户交付压缩包，并保留目录结构。
+
 ## 快速冒烟测试
 
 如果只想确认程序是否能够正常运行，可以执行一个很短的测试：
@@ -66,6 +82,22 @@ venv\Scripts\python.exe main.py --dae-epochs 2500 --clf-epochs 300 --device cpu
 ```powershell
 venv\Scripts\python.exe main.py --dae-epochs 2500 --clf-epochs 300 --device cuda
 ```
+
+## 当前推荐配置
+
+如果只需要使用当前仓库中已经验证过的最佳参数组合，推荐使用：
+
+```powershell
+venv\Scripts\python.exe main.py --dae-epochs 2500 --clf-epochs 1000 --dae-lr 0.0001 --clf-lr 0.0002 --wuc 0.025 --seed 42 --dae-feature-mode bottleneck_relu --device cpu --output-dir outputs
+```
+
+该组参数对应当前仓库中记录的最佳结果：
+
+- 平均准确率 `0.9494705882352942`
+- 重点难分类故障：
+  `F8 = 0.8670`
+  `F11 = 0.8730`
+  `F13 = 0.7830`
 
 ## 程序执行步骤
 
@@ -182,6 +214,10 @@ venv\Scripts\python.exe main.py --dae-epochs 2500 --clf-epochs 1000 --dae-lr 0.0
 - `report_assets/metrics_bottleneck_s42_w0025_clr2e4_ce1000.json`
 - `report_assets/figure_4_12_bottleneck_s42_w0025_clr2e4_ce1000.png`
 
+如果需要直接交付客户，也可以直接使用当前已经生成的压缩包：
+
+- `customer_delivery_dae.zip`
+
 ### 第 10 步：查看最终报告
 
 如果需要查看最终整理好的报告，可直接打开：
@@ -244,6 +280,9 @@ PYTHON_DAE_REPORT.docx
 
 - `report_assets/figure_4_12_bottleneck_s42_w0025_clr2e4_ce1000.png`
   当前选定的最终热值图，对应最佳实验结果。
+
+- `customer_delivery_dae.zip`
+  已经按当前推荐交付清单打包好的压缩包，内部保留原目录结构，可直接用于交付。
 
 以下文件根据客户实际需求决定是否交付：
 
