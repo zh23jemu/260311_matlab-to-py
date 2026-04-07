@@ -16,6 +16,7 @@ import torch
 from te_dae.dae_result_predict import (
     build_confusion,
     extract_encoded_features,
+    plot_dae_training_history,
     plot_heatmap,
     plot_label_sequence,
     plot_matrix_lines,
@@ -270,7 +271,7 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
     plot_network_diagram(paths["figures"] / "figure_4_10.png")
     plot_training_history(clf_history.losses, clf_history.accuracies, "Figure 1.11 Training Process", paths["figures"] / "figure_4_11.png")
     plot_heatmap(heat, fault_labels, "Figure 1.12 Heatmap", paths["figures"] / "figure_4_12.png")
-    plot_training_history(dae_history.losses, dae_history.accuracies, "DAE Training", paths["figures"] / "dae_training.png")
+    plot_dae_training_history(dae_history.losses, "DAE Training", paths["figures"] / "dae_training.png")
 
     print(f"[RESULT] mean_accuracy={mean_accuracy:.4f}")
     print(f"[RESULT] saved outputs to {paths['root']}")

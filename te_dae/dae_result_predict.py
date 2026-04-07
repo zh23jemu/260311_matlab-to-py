@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -279,6 +280,12 @@ def _save(fig: plt.Figure, path: Path) -> None:
     plt.close(fig)
 
 
+def _apply_chinese_font() -> None:
+    """尽量使用常见中文字体，避免图中中文乱码。"""
+    plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+
+
 def plot_matrix_lines(data: np.ndarray, title: str, path: Path, max_rows: int = 400) -> None:
     """绘制矩阵前若干行的折线图。
 
@@ -312,23 +319,59 @@ def plot_label_sequence(labels: np.ndarray, title: str, path: Path) -> None:
 def plot_training_history(losses: list[float], accuracies: list[float], title: str, path: Path) -> None:
     """绘制训练历史图。
 
-    统一输出左右两个子图：
-    - 左边看 loss 收敛情况
-    - 右边看 accuracy 变化趋势
+    对分类器训练过程，采用上下两个子图：
+    - 上图展示准确率变化
+    - 下图展示损失变化
 
-    即使 DAE 没有真实 accuracy，也保留相同版式，方便报告保持统一。
+    这种布局更接近日常训练监控界面的展示方式，也更方便和报告中的
+    “准确率升高、损失下降”文字说明对应起来。
     """
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    axes[0].plot(losses)
-    axes[0].set_title(f"{title} Loss")
-    axes[0].set_xlabel("Epoch")
-    axes[0].grid(alpha=0.2)
+    _apply_chinese_font()
+    epochs = list(range(1, len(losses) + 1))
+    accuracy_percent = np.asarray(accuracies, dtype=np.float64) * 100.0
 
-    axes[1].plot(accuracies)
-    axes[1].set_title(f"{title} Accuracy")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylim(0, 1.05)
-    axes[1].grid(alpha=0.2)
+    fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+    axes[0].plot(epochs, accuracy_percent, color="#1f77b4", linewidth=2.0)
+    axes[0].set_title("训练过程")
+    axes[0].set_ylabel("准确率(%)")
+    axes[0].set_ylim(0, 100)
+    axes[0].grid(alpha=0.25)
+
+    axes[1].plot(epochs, losses, color="#ff7f0e", linewidth=2.0)
+    axes[1].set_xlabel("迭代次数")
+    axes[1].set_ylabel("损失")
+    axes[1].grid(alpha=0.25)
+    _save(fig, path)
+
+
+def plot_dae_training_history(losses: list[float], title: str, path: Path) -> None:
+    """绘制 DAE 训练损失图。
+
+    DAE 是重建任务，不存在像分类器那样直接可解释的 accuracy。
+    因此这里仿照常见训练监控图的布局，绘制：
+    - 上图：相对收敛率（由损失下降幅度换算而来，用于直观展示收敛趋势）
+    - 下图：真实的均方误差损失曲线
+    """
+    _apply_chinese_font()
+    epochs = list(range(1, len(losses) + 1))
+    loss_array = np.asarray(losses, dtype=np.float64)
+    initial_loss = max(loss_array[0], 1e-12)
+    convergence = (1.0 - loss_array / initial_loss) * 100.0
+    convergence = np.clip(convergence, 0.0, 100.0)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+
+    axes[0].plot(epochs, convergence, color="#1f77b4", linewidth=2.0)
+    axes[0].set_title(f"训练进度（{timestamp}）")
+    axes[0].set_ylabel("收敛率(%)")
+    axes[0].set_ylim(0, 100)
+    axes[0].grid(alpha=0.25)
+
+    axes[1].plot(epochs, loss_array, color="#ff7f0e", linewidth=2.0)
+    axes[1].set_xlabel("迭代次数")
+    axes[1].set_ylabel("均方误差")
+    axes[1].grid(alpha=0.25)
     _save(fig, path)
 
 
@@ -404,6 +447,7 @@ __all__ = [
     "extract_encoded_features",
     "predict_classes",
     "plot_heatmap",
+    "plot_dae_training_history",
     "plot_label_sequence",
     "plot_matrix_lines",
     "plot_network_diagram",
