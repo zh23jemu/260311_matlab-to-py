@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import matplotlib
 
@@ -55,6 +56,44 @@ def _output_dirs(root: Path, output_dir: str) -> dict[str, Path]:
     return paths
 
 
+def _app_root() -> Path:
+    """返回当前程序应视为“根目录”的位置。
+
+    - 开发环境：项目根目录
+    - PyInstaller 打包后：exe 所在目录
+
+    这样可以保证客户版程序把 `data567.mat`、`outputs/` 都放在 exe 同级目录下。
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+def _resolve_mat_path(root: Path, explicit_path: str | None = None) -> Path:
+    """解析数据文件路径。
+
+    客户版优先读取程序根目录下的 `data567.mat`；
+    开发环境仍兼容旧路径 `CNN/data567.mat`。
+    """
+    candidates: list[Path] = []
+    if explicit_path:
+        candidates.append(Path(explicit_path).expanduser().resolve())
+    candidates.extend(
+        [
+            root / "data567.mat",
+            root / "CNN" / "data567.mat",
+        ]
+    )
+    for path in candidates:
+        if path.exists():
+            return path
+    searched = "\n".join(f"- {path}" for path in candidates)
+    raise FileNotFoundError(
+        "未找到 data567.mat，请把数据文件放在程序所在目录。\n"
+        f"已检查位置：\n{searched}"
+    )
+
+
 def _save_json(path: Path, payload: dict) -> None:
     """以统一格式保存 JSON 文件。
 
@@ -81,6 +120,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--output-dir", default="outputs")
     parser.add_argument("--dae-feature-mode", default="bottleneck_relu", choices=["fc3_linear", "bottleneck_relu"])
+    parser.add_argument("--data-path", default=None)
     return parser.parse_args()
 
 
@@ -104,12 +144,12 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
     它负责把“数据准备 -> DAE 训练 -> 特征提取 -> 分类训练 -> 评估 -> 导出”
     串成一次完整实验。
     """
-    root = Path(__file__).resolve().parent.parent
+    root = _app_root()
     paths = _output_dirs(root, args.output_dir)
     set_seed(args.seed)
 
-    # 数据文件路径固定放在项目根目录下，保持和当前仓库结构一致。
-    mat_path = root / "CNN" / "data567.mat"
+    # 客户版优先读取 exe 同目录下的 data567.mat，开发环境兼容 CNN/data567.mat。
+    mat_path = _resolve_mat_path(root, args.data_path)
     device = _resolve_device(args.device)
 
     print(f"[PIPELINE] root={root}")

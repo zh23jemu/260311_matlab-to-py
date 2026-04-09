@@ -3,6 +3,7 @@
 本项目用于复现 `去噪自编码器py编程.docx` 中描述的工作流程，并给出对应的 Python 实现版本。
 
 当前仓库已经整理为更适合交付和阅读的结构：
+
 - 核心代码集中在 `te_dae/` 下的 4 个主文件
 - 最终报告为 `PYTHON_DAE_REPORT.docx`
 - 当前客户交付压缩包为 `customer_delivery_dae.zip`
